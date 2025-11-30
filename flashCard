@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Süper Hızlı Flashcard</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #6c5ce7;
+            --secondary: #a29bfe;
+            --bg: #dfe6e9;
+            --panel-bg: #ffffff;
+            --text: #2d3436;
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background-color: var(--bg);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        /* --- ANA KONTEYNERLER --- */
+        .app-container {
+            display: flex;
+            gap: 20px;
+            max-width: 1000px;
+            width: 100%;
+            height: 85vh;
+        }
+
+        /* --- SOL SÜTUN: EDİTÖR --- */
+        .editor-panel {
+            flex: 1;
+            background: var(--panel-bg);
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        h2 { margin-top: 0; color: var(--primary); }
+
+        .input-group { margin-bottom: 15px; }
+        .input-group label { display: block; margin-bottom: 5px; font-weight: 600; color: #636e72; }
+        
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #b2bec3;
+            border-radius: 8px;
+            box-sizing: border-box;
+            transition: 0.3s;
+        }
+        input[type="text"]:focus { border-color: var(--primary); outline: none; }
+
+        /* --- MEDYA ALANI (Ctrl+V & Dosya) --- */
+        .media-dropzone {
+            border: 2px dashed #b2bec3;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            background: #f1f2f6;
+            cursor: pointer;
+            transition: 0.3s;
+            position: relative;
+            margin-bottom: 15px;
+        }
+
+        .media-dropzone:hover {
+            border-color: var(--primary);
+            background: #ecebfc;
+        }
+        
+        /* Resim eklendiğinde yeşil yanıp sönmesi için */
+        .media-dropzone.success-flash {
+            animation: flashGreen 0.5s ease;
+            border-color: #00b894;
+        }
+
+        @keyframes flashGreen {
+            0% { background-color: #f1f2f6; }
+            50% { background-color: #55efc4; }
+            100% { background-color: #f1f2f6; }
+        }
+
+        .media-dropzone p { margin: 0; color: #636e72; font-size: 0.9rem; }
+        .media-dropzone i { font-size: 2rem; color: var(--secondary); margin-bottom: 10px; }
+
+        #fileInput { display: none; } /* Gizli input */
+
+        /* Önizleme Resmi */
+        #previewImg {
+            max-width: 100%;
+            max-height: 150px;
+            display: none;
+            margin-top: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            border: 2px solid var(--primary);
+        }
+
+        .or-divider { text-align: center; margin: 10px 0; color: #b2bec3; font-size: 0.8rem; }
+
+        /* Butonlar */
+        .btn {
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.2s;
+            width: 100%;
+        }
+
+        .btn-add { background: var(--primary); color: white; margin-top: 10px; }
+        .btn-add:hover { background: #5649c0; }
+
+        .btn-start { 
+            background: #00b894; color: white; 
+            margin-top: auto; 
+            font-size: 1.2rem;
+            padding: 15px;
+        }
+
+        /* --- SAĞ SÜTUN: LİSTE --- */
+        .list-panel {
+            flex: 1;
+            background: var(--panel-bg);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+            overflow-y: auto;
+        }
+
+        .word-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            gap: 10px;
+        }
+
+        .word-item img {
+            width: 40px;
+            height: 40px;
+            object-fit: cover;
+            border-radius: 4px;
+            background: #eee;
+        }
+
+        .word-info { flex: 1; }
+        .word-eng { font-weight: bold; }
+        .word-tr { font-size: 0.9rem; color: #636e72; }
+        
+        .btn-del { 
+            background: #ff7675; color: white; border: none; 
+            width: 25px; height: 25px; border-radius: 50%; cursor: pointer; 
+        }
+
+        /* --- STUDY MODE (FLASHCARD) --- */
+        #studyMode {
+            display: none;
+            width: 100%;
+            height: 100%;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .card-scene {
+            width: 350px;
+            height: 500px;
+            perspective: 1000px;
+            cursor: pointer;
+        }
+
+        .card {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+        }
+
+        .card.is-flipped { transform: rotateY(180deg); }
+
+        .card-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: white;
+            padding: 20px;
+            box-sizing: border-box;
+            text-align: center;
+        }
+
+        .card-front { border: 2px solid #dfe6e9; }
+        .card-back { 
+            transform: rotateY(180deg); 
+            background: #2d3436; 
+            color: white; 
+        }
+        
+        .card-back img {
+            max-width: 90%;
+            max-height: 50%;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            object-fit: contain;
+        }
+
+        .return-btn {
+            position: absolute;
+            top: 20px; left: 20px;
+            background: white; padding: 10px 20px;
+            border-radius: 30px; border: none;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            cursor: pointer; font-weight: bold; color: var(--text);
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="app-container" id="editorContainer">
+        
+        <div class="editor-panel">
+            <h2><i class="fas fa-plus-circle"></i> Kart Oluştur</h2>
+            
+            <div class="input-group">
+                <label>İngilizce Kelime</label>
+                <input type="text" id="inpEng" placeholder="Örn: Serendipity">
+            </div>
+
+            <div class="input-group">
+                <label>Türkçe Anlamı</label>
+                <input type="text" id="inpTr" placeholder="Örn: Mutlu tesadüf">
+            </div>
+
+            <label style="font-weight:600; color:#636e72; display:block; margin-bottom:5px;">Görsel / GIF</label>
+            
+            <div class="media-dropzone" id="pasteArea">
+                <i class="fas fa-cloud-upload-alt"></i>
+                <p><strong>CTRL + V</strong> ile direkt yapıştır</p>
+                <p style="font-size:0.8rem; margin-top:5px;">veya dosya seçmek için tıkla</p>
+                <input type="file" id="fileInput" accept="image/*">
+                <img id="previewImg" src="" alt="Önizleme">
+            </div>
+
+            <div class="or-divider">- VEYA LINK -</div>
+
+            <div class="input-group">
+                <input type="text" id="inpGifLink" placeholder="Giphy GIF Linkini buraya yapıştır...">
+            </div>
+
+            <button class="btn btn-add" onclick="addCard()">Listeye Ekle</button>
+            <button class="btn btn-start" onclick="startStudy()">Çalışmaya Başla <i class="fas fa-arrow-right"></i></button>
+        </div>
+
+        <div class="list-panel">
+            <h3 style="margin-top:0; color:var(--text)">Eklenen Kartlar (<span id="count">0</span>)</h3>
+            <div id="wordList">
+                <p style="color:#b2bec3; text-align:center;">Henüz kart eklemedin.</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="studyMode">
+        <button class="return-btn" onclick="stopStudy()"><i class="fas fa-arrow-left"></i> Düzenleyiciye Dön</button>
+        
+        <div class="card-scene" onclick="flipCard()">
+            <div class="card" id="flashcard">
+                <div class="card-face card-front">
+                    <h1 id="studyEng" style="font-size: 2.5rem; color:var(--primary);">...</h1>
+                    <p style="color:#b2bec3; margin-top:20px;">(Dokun ve Çevir)</p>
+                </div>
+                <div class="card-face card-back">
+                    <img id="studyImg" src="" style="display:none">
+                    <h2 id="studyTr">...</h2>
+                </div>
+            </div>
+        </div>
+
+        <div style="margin-top:30px; display:flex; gap:20px;">
+            <button class="btn" style="background:white; width:auto; padding:10px 20px;" onclick="prevCard()"><i class="fas fa-chevron-left"></i> Önceki</button>
+            <button class="btn" style="background:white; width:auto; padding:10px 20px;" onclick="nextCard()">Sonraki <i class="fas fa-chevron-right"></i></button>
+        </div>
+    </div>
+
+    <script>
+        let cards = [];
+        let currentImageBase64 = null;
+        let studyIndex = 0;
+
+        // --- DOM ELEMENTLERİ ---
+        const pasteArea = document.getElementById('pasteArea');
+        const fileInput = document.getElementById('fileInput');
+        const previewImg = document.getElementById('previewImg');
+        const gifInput = document.getElementById('inpGifLink');
+        const wordListEl = document.getElementById('wordList');
+
+        // --- GLOBAL PASTE LISTENERS (DÜZELTİLDİ) ---
+        // Artık sayfanın herhangi bir yerindeyken Ctrl+V çalışır
+        document.addEventListener('paste', function(e) {
+            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+            let blob = null;
+
+            // Panodaki öğeleri tara, resim varsa yakala
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf("image") === 0) {
+                    blob = items[i].getAsFile();
+                    break;
+                }
+            }
+
+            // Eğer resim bulduysak işle
+            if (blob) {
+                // Eğer odak bir yazı kutusundaysa ve resim yapıştırılıyorsa
+                // varsayılanı engellemeye gerek yok ama görsel geri bildirimi verelim.
+                handleFile(blob);
+                
+                // Görsel efekti: Alanın yanıp sönmesi
+                pasteArea.classList.add('success-flash');
+                setTimeout(() => {
+                    pasteArea.classList.remove('success-flash');
+                }, 500);
+            }
+        });
+
+        // Tıklayarak Dosya Seçme
+        pasteArea.addEventListener('click', (e) => {
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', function(e) {
+            handleFile(this.files[0]);
+        });
+
+        function handleFile(file) {
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                currentImageBase64 = e.target.result;
+                previewImg.src = currentImageBase64;
+                previewImg.style.display = 'block';
+                // Link inputunu temizle karışmasın
+                gifInput.value = '';
+            }
+            reader.readAsDataURL(file);
+        }
+
+        // GIF Linki girilirse resmi sıfırla
+        gifInput.addEventListener('input', () => {
+            if(gifInput.value.length > 0) {
+                currentImageBase64 = null;
+                previewImg.style.display = 'none';
+            }
+        });
+
+        // --- KART YÖNETİMİ ---
+
+        function addCard() {
+            const eng = document.getElementById('inpEng').value.trim();
+            const tr = document.getElementById('inpTr').value.trim();
+            let finalImage = currentImageBase64;
+
+            if (!finalImage && gifInput.value.trim() !== "") {
+                finalImage = gifInput.value.trim();
+            }
+
+            if (!eng || !tr) {
+                alert("Lütfen İngilizce ve Türkçe alanlarını doldurun.");
+                return;
+            }
+
+            const newCard = {
+                id: Date.now(),
+                eng: eng,
+                tr: tr,
+                img: finalImage
+            };
+
+            cards.push(newCard);
+            renderList();
+            resetForm();
+        }
+
+        function resetForm() {
+            document.getElementById('inpEng').value = '';
+            document.getElementById('inpTr').value = '';
+            document.getElementById('inpGifLink').value = '';
+            previewImg.src = '';
+            previewImg.style.display = 'none';
+            currentImageBase64 = null;
+            document.getElementById('inpEng').focus(); // Seri ekleme için başa dön
+        }
+
+        function renderList() {
+            document.getElementById('count').innerText = cards.length;
+            
+            if (cards.length === 0) {
+                wordListEl.innerHTML = '<p style="color:#b2bec3; text-align:center;">Henüz kart eklemedin.</p>';
+                return;
+            }
+
+            wordListEl.innerHTML = '';
+            cards.forEach((card, index) => {
+                const div = document.createElement('div');
+                div.className = 'word-item';
+                div.innerHTML = `
+                    <img src="${card.img || 'https://via.placeholder.com/40?text=Tx'}" onerror="this.src='https://via.placeholder.com/40?text=Err'">
+                    <div class="word-info">
+                        <div class="word-eng">${card.eng}</div>
+                        <div class="word-tr">${card.tr}</div>
+                    </div>
+                    <button class="btn-del" onclick="deleteCard(${index})">×</button>
+                `;
+                wordListEl.appendChild(div);
+            });
+        }
+
+        function deleteCard(index) {
+            cards.splice(index, 1);
+            renderList();
+        }
+
+        // --- STUDY MODE ---
+
+        function startStudy() {
+            if (cards.length === 0) {
+                alert("Lütfen önce listeye en az bir kart ekle!");
+                return;
+            }
+            document.getElementById('editorContainer').style.display = 'none';
+            document.getElementById('studyMode').style.display = 'flex';
+            studyIndex = 0;
+            showCard(studyIndex);
+        }
+
+        function stopStudy() {
+            document.getElementById('studyMode').style.display = 'none';
+            document.getElementById('editorContainer').style.display = 'flex';
+        }
+
+        const cardEl = document.getElementById('flashcard');
+        const studyEng = document.getElementById('studyEng');
+        const studyTr = document.getElementById('studyTr');
+        const studyImg = document.getElementById('studyImg');
+
+        function showCard(index) {
+            cardEl.classList.remove('is-flipped');
+            setTimeout(() => {
+                const item = cards[index];
+                studyEng.innerText = item.eng;
+                studyTr.innerText = item.tr;
+                
+                if (item.img) {
+                    studyImg.src = item.img;
+                    studyImg.style.display = 'block';
+                } else {
+                    studyImg.style.display = 'none';
+                }
+            }, 200);
+        }
+
+        function flipCard() {
+            cardEl.classList.toggle('is-flipped');
+        }
+
+        function nextCard() {
+            studyIndex = (studyIndex + 1) % cards.length;
+            showCard(studyIndex);
+        }
+
+        function prevCard() {
+            studyIndex = (studyIndex - 1 + cards.length) % cards.length;
+            showCard(studyIndex);
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (document.getElementById('studyMode').style.display === 'flex') {
+                if (e.code === 'Space') flipCard();
+                if (e.code === 'ArrowRight') nextCard();
+                if (e.code === 'ArrowLeft') prevCard();
+            }
+        });
+
+    </script>
+</body>
+</html>
